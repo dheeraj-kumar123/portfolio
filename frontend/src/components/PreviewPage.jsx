@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Github, Linkedin, Mail, Globe, ExternalLink, ArrowLeft } from 'lucide-react';
+import { Github, Linkedin, Mail, Globe, ExternalLink, ArrowLeft, Download } from 'lucide-react';
 import { portfolioAPI } from '../services/api';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 function PreviewPage({ onNavigate }) {
   const [portfolio, setPortfolio] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => { loadPortfolio(); }, []);
 
@@ -16,6 +19,40 @@ function PreviewPage({ onNavigate }) {
       console.error('Error loading portfolio');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadPDF = async () => {
+    const element = document.getElementById('portfolio-content');
+    if (!element) return;
+
+    setDownloading(true);
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 1024
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [canvas.width / 2, canvas.height / 2] // Scale back for proper density
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${portfolio.personalInfo.name || 'Portfolio'}.pdf`);
+    } catch (err) {
+      console.error('PDF Error:', err);
+      alert('Could not generate PDF. Please try again.');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -42,139 +79,146 @@ function PreviewPage({ onNavigate }) {
           <ArrowLeft size={18} /> Back to Editor
         </button>
         <h2 className="text-xl font-bold gradient-text">📱 Portfolio Preview</h2>
-        <div className="w-32"></div>
+        <button onClick={downloadPDF} disabled={downloading}
+          className={`flex items-center gap-2 text-white px-4 py-2 rounded-lg shadow-md transition ${downloading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}>
+          <Download size={18} className={downloading ? 'animate-bounce' : ''} />
+          {downloading ? 'Generating PDF...' : 'Download PDF'}
+        </button>
       </div>
 
-      <div className="container mx-auto px-4 py-12 max-w-5xl">
-        <div className="text-center mb-16 fade-in">
-          {personalInfo.image && (
-            <img src={personalInfo.image} alt={personalInfo.name}
-              className="w-32 h-32 rounded-full mx-auto mb-6 object-cover border-4 shadow-lg card-hover"
-              style={{ borderColor: theme.primaryColor }} />
-          )}
-          <h1 className="text-5xl font-bold mb-2">{personalInfo.name || 'Your Name'}</h1>
-          <p className="text-2xl mb-4 font-semibold" style={{ color: theme.primaryColor }}>
-            {personalInfo.title || 'Your Title'}
-          </p>
-          <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">{personalInfo.bio}</p>
-          <div className="flex justify-center gap-4 mt-6">
-            {contact.github && (
-              <a href={contact.github} target="_blank" rel="noopener noreferrer"
-                className="p-3 rounded-full bg-white shadow-md hover:shadow-lg transition card-hover"
-                style={{ color: theme.primaryColor }}>
-                <Github size={24} />
-              </a>
-            )}
-            {contact.linkedin && (
-              <a href={contact.linkedin} target="_blank" rel="noopener noreferrer"
-                className="p-3 rounded-full bg-white shadow-md hover:shadow-lg transition card-hover"
-                style={{ color: theme.primaryColor }}>
-                <Linkedin size={24} />
-              </a>
-            )}
-            {contact.email && (
-              <a href={`mailto:${contact.email}`}
-                className="p-3 rounded-full bg-white shadow-md hover:shadow-lg transition card-hover"
-                style={{ color: theme.primaryColor }}>
-                <Mail size={24} />
-              </a>
-            )}
-            {contact.website && (
-              <a href={contact.website} target="_blank" rel="noopener noreferrer"
-                className="p-3 rounded-full bg-white shadow-md hover:shadow-lg transition card-hover"
-                style={{ color: theme.primaryColor }}>
-                <Globe size={24} />
-              </a>
-            )}
-          </div>
-        </div>
+      <div id="portfolio-content" className="bg-white">
 
-        {skills.length > 0 && (
-          <div className="mb-16 fade-in">
-            <h2 className="text-3xl font-bold mb-8" style={{ color: theme.primaryColor }}>⚡ Skills</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              {skills.map((skill, i) => (
-                <div key={i} className="bg-white p-4 rounded-lg shadow-md card-hover">
-                  <div className="flex justify-between mb-2">
-                    <span className="font-semibold">{skill.name}</span>
-                    <span className="font-bold" style={{ color: theme.primaryColor }}>{skill.level}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="h-2 rounded-full transition-all"
-                      style={{ width: `${skill.level}%`, backgroundColor: theme.primaryColor }} />
-                  </div>
-                </div>
-              ))}
+        <div className="container mx-auto px-4 py-12 max-w-5xl">
+          <div className="text-center mb-16 fade-in">
+            {personalInfo.image && (
+              <img src={personalInfo.image} alt={personalInfo.name}
+                className="w-32 h-32 rounded-full mx-auto mb-6 object-cover border-4 shadow-lg card-hover"
+                style={{ borderColor: theme.primaryColor }} />
+            )}
+            <h1 className="text-5xl font-bold mb-2">{personalInfo.name || 'Your Name'}</h1>
+            <p className="text-2xl mb-4 font-semibold" style={{ color: theme.primaryColor }}>
+              {personalInfo.title || 'Your Title'}
+            </p>
+            <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">{personalInfo.bio}</p>
+            <div className="flex justify-center gap-4 mt-6">
+              {contact.github && (
+                <a href={contact.github} target="_blank" rel="noopener noreferrer"
+                  className="p-3 rounded-full bg-white shadow-md hover:shadow-lg transition card-hover"
+                  style={{ color: theme.primaryColor }}>
+                  <Github size={24} />
+                </a>
+              )}
+              {contact.linkedin && (
+                <a href={contact.linkedin} target="_blank" rel="noopener noreferrer"
+                  className="p-3 rounded-full bg-white shadow-md hover:shadow-lg transition card-hover"
+                  style={{ color: theme.primaryColor }}>
+                  <Linkedin size={24} />
+                </a>
+              )}
+              {contact.email && (
+                <a href={`mailto:${contact.email}`}
+                  className="p-3 rounded-full bg-white shadow-md hover:shadow-lg transition card-hover"
+                  style={{ color: theme.primaryColor }}>
+                  <Mail size={24} />
+                </a>
+              )}
+              {contact.website && (
+                <a href={contact.website} target="_blank" rel="noopener noreferrer"
+                  className="p-3 rounded-full bg-white shadow-md hover:shadow-lg transition card-hover"
+                  style={{ color: theme.primaryColor }}>
+                  <Globe size={24} />
+                </a>
+              )}
             </div>
           </div>
-        )}
 
-        {projects.length > 0 && (
-          <div className="mb-16 fade-in">
-            <h2 className="text-3xl font-bold mb-8" style={{ color: theme.primaryColor }}>💼 Projects</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              {projects.map((p, i) => (
-                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden card-hover">
-                  {p.image && <img src={p.image} alt={p.title} className="w-full h-48 object-cover" />}
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold mb-2">{p.title}</h3>
-                    <p className="text-gray-600 mb-4">{p.description}</p>
-                    <div className="flex gap-4">
-                      {p.github && (
-                        <a href={p.github} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-2 font-medium hover:underline"
-                          style={{ color: theme.primaryColor }}>
-                          <Github size={18} />Code
-                        </a>
-                      )}
-                      {p.demo && (
-                        <a href={p.demo} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-2 font-medium hover:underline"
-                          style={{ color: theme.primaryColor }}>
-                          <ExternalLink size={18} />Demo
-                        </a>
-                      )}
+          {skills.length > 0 && (
+            <div className="mb-16 fade-in">
+              <h2 className="text-3xl font-bold mb-8" style={{ color: theme.primaryColor }}>⚡ Skills</h2>
+              <div className="grid md:grid-cols-2 gap-6">
+                {skills.map((skill, i) => (
+                  <div key={i} className="bg-white p-4 rounded-lg shadow-md card-hover">
+                    <div className="flex justify-between mb-2">
+                      <span className="font-semibold">{skill.name}</span>
+                      <span className="font-bold" style={{ color: theme.primaryColor }}>{skill.level}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="h-2 rounded-full transition-all"
+                        style={{ width: `${skill.level}%`, backgroundColor: theme.primaryColor }} />
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {projects.length > 0 && (
+            <div className="mb-16 fade-in">
+              <h2 className="text-3xl font-bold mb-8" style={{ color: theme.primaryColor }}>💼 Projects</h2>
+              <div className="grid md:grid-cols-2 gap-6">
+                {projects.map((p, i) => (
+                  <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden card-hover">
+                    {p.image && <img src={p.image} alt={p.title} className="w-full h-48 object-cover" />}
+                    <div className="p-6">
+                      <h3 className="text-xl font-bold mb-2">{p.title}</h3>
+                      <p className="text-gray-600 mb-4">{p.description}</p>
+                      <div className="flex gap-4">
+                        {p.github && (
+                          <a href={p.github} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-2 font-medium hover:underline"
+                            style={{ color: theme.primaryColor }}>
+                            <Github size={18} />Code
+                          </a>
+                        )}
+                        {p.demo && (
+                          <a href={p.demo} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-2 font-medium hover:underline"
+                            style={{ color: theme.primaryColor }}>
+                            <ExternalLink size={18} />Demo
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {experience.length > 0 && (
+            <div className="mb-16 fade-in">
+              <h2 className="text-3xl font-bold mb-8" style={{ color: theme.primaryColor }}>💻 Experience</h2>
+              {experience.map((ex, i) => (
+                <div key={i} className="bg-white rounded-lg shadow-md p-6 mb-4 card-hover">
+                  <h3 className="text-xl font-bold">{ex.position}</h3>
+                  <p className="font-semibold" style={{ color: theme.primaryColor }}>{ex.company}</p>
+                  <p className="text-sm text-gray-600 mb-2">{ex.duration}</p>
+                  <p className="text-gray-700">{ex.description}</p>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {experience.length > 0 && (
-          <div className="mb-16 fade-in">
-            <h2 className="text-3xl font-bold mb-8" style={{ color: theme.primaryColor }}>💻 Experience</h2>
-            {experience.map((ex, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-md p-6 mb-4 card-hover">
-                <h3 className="text-xl font-bold">{ex.position}</h3>
-                <p className="font-semibold" style={{ color: theme.primaryColor }}>{ex.company}</p>
-                <p className="text-sm text-gray-600 mb-2">{ex.duration}</p>
-                <p className="text-gray-700">{ex.description}</p>
-              </div>
-            ))}
-          </div>
-        )}
+          {education.length > 0 && (
+            <div className="mb-16 fade-in">
+              <h2 className="text-3xl font-bold mb-8" style={{ color: theme.primaryColor }}>🎓 Education</h2>
+              {education.map((e, i) => (
+                <div key={i} className="bg-white rounded-lg shadow-md p-6 mb-4 card-hover">
+                  <h3 className="text-xl font-bold">{e.degree}</h3>
+                  <p className="font-semibold" style={{ color: theme.primaryColor }}>{e.school}</p>
+                  <p className="text-sm text-gray-600 mb-2">{e.year}</p>
+                  <p className="text-gray-700">{e.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
 
-        {education.length > 0 && (
-          <div className="mb-16 fade-in">
-            <h2 className="text-3xl font-bold mb-8" style={{ color: theme.primaryColor }}>🎓 Education</h2>
-            {education.map((e, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-md p-6 mb-4 card-hover">
-                <h3 className="text-xl font-bold">{e.degree}</h3>
-                <p className="font-semibold" style={{ color: theme.primaryColor }}>{e.school}</p>
-                <p className="text-sm text-gray-600 mb-2">{e.year}</p>
-                <p className="text-gray-700">{e.description}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="text-center bg-white rounded-lg shadow-md p-8 fade-in">
-          <h2 className="text-3xl font-bold mb-6" style={{ color: theme.primaryColor }}>📞 Get In Touch</h2>
-          <div className="flex flex-wrap justify-center gap-6 text-gray-700">
-            {contact.email && <p className="font-medium">📧 {contact.email}</p>}
-            {contact.phone && <p className="font-medium">📱 {contact.phone}</p>}
+          <div className="text-center bg-white rounded-lg shadow-md p-8 fade-in">
+            <h2 className="text-3xl font-bold mb-6" style={{ color: theme.primaryColor }}>📞 Get In Touch</h2>
+            <div className="flex flex-wrap justify-center gap-6 text-gray-700">
+              {contact.email && <p className="font-medium">📧 {contact.email}</p>}
+              {contact.phone && <p className="font-medium">📱 {contact.phone}</p>}
+            </div>
           </div>
         </div>
       </div>

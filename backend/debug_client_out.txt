@@ -1,0 +1,10 @@
+Attempting to register user...
+Success: {
+  message: 'User registered successfully',
+  token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NGEwMTRkODdkNDliNzc0ZDY0OGE3YyIsImlhdCI6MTc2NjQ1NzY3NywiZXhwIjoxNzY2NTQ0MDc3fQ.YO1358_Krq2Wb0v8ru9iB6C7PqtOpv93S4dv0sw5DiM',
+  user: {
+    id: '694a014d87d49b774d648a7c',
+    name: 'DebugUser',
+    email: 'debug_1766457677381@test.com'
+  }
+}

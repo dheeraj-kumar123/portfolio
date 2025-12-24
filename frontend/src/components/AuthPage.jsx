@@ -22,7 +22,7 @@ function AuthPage({ onNavigate }) {
       }
       onNavigate('dashboard');
     } catch (err) {
-      setError(err.response?.data?.error || 'An error occurred');
+      setError(err.response?.data?.message || err.response?.data?.error || 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -39,13 +39,13 @@ function AuthPage({ onNavigate }) {
             {isLogin ? 'Login to continue building' : 'Start building your portfolio'}
           </p>
         </div>
-        
+
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded mb-4 fade-in">
             <p className="font-medium">❌ {error}</p>
           </div>
         )}
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div>
@@ -98,7 +98,7 @@ function AuthPage({ onNavigate }) {
             )}
           </button>
         </form>
-        
+
         <p className="mt-6 text-center text-gray-600">
           {isLogin ? "Don't have an account? " : "Already have an account? "}
           <button
@@ -111,7 +111,7 @@ function AuthPage({ onNavigate }) {
             {isLogin ? 'Sign Up' : 'Login'}
           </button>
         </p>
-        
+
         <button
           onClick={() => onNavigate('home')}
           className="mt-4 text-gray-500 hover:text-gray-700 w-full text-center font-medium"

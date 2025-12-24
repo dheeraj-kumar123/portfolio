@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Plus, Trash2, Eye, Share2, Save, LogOut, Menu, X } from 'lucide-react';
+import { Plus, Trash2, Eye, Share2, Save, LogOut, Menu, X, Download, Github, Linkedin, Mail, Globe, ExternalLink } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import { portfolioAPI } from '../services/api';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 function Dashboard({ onNavigate }) {
   const { user, logout } = useContext(AuthContext);
@@ -16,15 +18,18 @@ function Dashboard({ onNavigate }) {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => { loadPortfolio(); }, []);
 
   const loadPortfolio = async () => {
     try {
       const res = await portfolioAPI.get();
-      setPortfolio(res.data);
+      if (res.data) {
+        setPortfolio(res.data);
+      }
     } catch (error) {
-      console.log('No portfolio');
+      console.log('No portfolio found or error fetching');
     } finally {
       setLoading(false);
     }
@@ -41,10 +46,10 @@ function Dashboard({ onNavigate }) {
   };
 
   const publishPortfolio = async () => {
-    if (!portfolio.username) { 
-      alert('⚠️ Please set a username before publishing'); 
+    if (!portfolio.username) {
+      alert('⚠️ Please set a username before publishing');
       setActiveSection('personal');
-      return; 
+      return;
     }
     try {
       await portfolioAPI.save({ ...portfolio, published: true });
@@ -52,6 +57,46 @@ function Dashboard({ onNavigate }) {
       alert('🎉 Portfolio published successfully!');
     } catch (error) {
       alert('Error: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const downloadPDF = async () => {
+    const element = document.getElementById('hidden-preview');
+    if (!element) return;
+
+    setDownloading(true);
+    try {
+      // Temporarily set display block for capture
+      element.style.display = 'block';
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        width: 1024
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [canvas.width / 2, canvas.height / 2]
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${portfolio.personalInfo.name || 'Portfolio'}.pdf`);
+
+    } catch (err) {
+      console.error('PDF Error:', err);
+      alert('Could not generate PDF. Please try again.');
+    } finally {
+      // Ensure it stays off-screen
+      element.style.display = 'block';
+      setDownloading(false);
     }
   };
 
@@ -97,6 +142,14 @@ function Dashboard({ onNavigate }) {
               Preview
             </button>
             <button
+              onClick={downloadPDF}
+              disabled={downloading}
+              className={`hidden md:flex items-center gap-2 text-white px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition ${downloading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+            >
+              <Download size={18} className={downloading ? 'animate-bounce' : ''} />
+              {downloading ? '...' : 'Download'}
+            </button>
+            <button
               onClick={logout}
               className="hidden md:flex items-center gap-2 text-gray-700 hover:text-red-600 transition"
             >
@@ -111,7 +164,7 @@ function Dashboard({ onNavigate }) {
             </button>
           </div>
         </div>
-        
+
         {mobileMenuOpen && (
           <div className="md:hidden border-t bg-white p-4 space-y-2 fade-in">
             <button onClick={savePortfolio} className="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
@@ -119,6 +172,9 @@ function Dashboard({ onNavigate }) {
             </button>
             <button onClick={() => onNavigate('preview')} className="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
               <Eye size={18} /> Preview
+            </button>
+            <button onClick={downloadPDF} disabled={downloading} className={`w-full text-left px-4 py-2 rounded-lg flex items-center gap-2 ${downloading ? 'bg-gray-100 text-gray-400' : 'hover:bg-gray-100'}`}>
+              <Download size={18} /> {downloading ? 'Generating PDF...' : 'Download'}
             </button>
             <button onClick={logout} className="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2 text-red-600">
               <LogOut size={18} /> Logout
@@ -137,11 +193,10 @@ function Dashboard({ onNavigate }) {
             <button
               key={s.id}
               onClick={() => setActiveSection(s.id)}
-              className={`w-full text-left px-4 py-3 rounded-lg mb-2 font-medium transition-all ${
-                activeSection === s.id
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-md'
-                  : 'hover:bg-gray-100 text-gray-700'
-              }`}
+              className={`w-full text-left px-4 py-3 rounded-lg mb-2 font-medium transition-all ${activeSection === s.id
+                ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-md'
+                : 'hover:bg-gray-100 text-gray-700'
+                }`}
             >
               {s.label}
             </button>
@@ -221,8 +276,8 @@ function Dashboard({ onNavigate }) {
                           const s = [...portfolio.skills];
                           s[i].level = e.target.value;
                           setPortfolio({ ...portfolio, skills: s });
-                        }} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" 
-                        style={{background: `linear-gradient(to right, #8B5CF6 0%, #8B5CF6 ${skill.level}%, #e5e7eb ${skill.level}%, #e5e7eb 100%)`}} />
+                        }} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                        style={{ background: `linear-gradient(to right, #8B5CF6 0%, #8B5CF6 ${skill.level}%, #e5e7eb ${skill.level}%, #e5e7eb 100%)` }} />
                     </div>
                   </div>
                 ))
@@ -468,6 +523,98 @@ function Dashboard({ onNavigate }) {
               </div>
             </div>
           )}
+        </div>
+      </div>
+      {/* Hidden Preview for PDF Generation - Improved visibility for capture */}
+      <div id="hidden-preview" style={{
+        position: 'fixed',
+        left: '0',
+        top: '0',
+        width: '1024px',
+        backgroundColor: 'white',
+        fontFamily: portfolio.theme.font,
+        zIndex: -9999,
+        pointerEvents: 'none',
+        visibility: 'visible',
+        display: 'block',
+        minHeight: '1000px'
+      }}>
+        <div className="container mx-auto px-4 py-12">
+          <div className="text-center mb-16">
+            {portfolio.personalInfo.image && (
+              <img src={portfolio.personalInfo.image} alt={portfolio.personalInfo.name} className="w-32 h-32 rounded-full mx-auto mb-6 object-cover border-4" style={{ borderColor: portfolio.theme.primaryColor }} />
+            )}
+            <h1 className="text-5xl font-bold mb-2">{portfolio.personalInfo.name || 'Your Name'}</h1>
+            <p className="text-2xl mb-4 font-semibold" style={{ color: portfolio.theme.primaryColor }}>{portfolio.personalInfo.title || 'Your Title'}</p>
+            <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">{portfolio.personalInfo.bio}</p>
+          </div>
+          {portfolio.skills.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold mb-8" style={{ color: portfolio.theme.primaryColor }}>⚡ Skills</h2>
+              <div className="grid grid-cols-2 gap-6">
+                {portfolio.skills.map((skill, i) => (
+                  <div key={i} className="bg-white p-4 rounded-lg shadow-sm border">
+                    <div className="flex justify-between mb-2">
+                      <span className="font-semibold">{skill.name}</span>
+                      <span className="font-bold" style={{ color: portfolio.theme.primaryColor }}>{skill.level}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="h-2 rounded-full" style={{ width: `${skill.level}%`, backgroundColor: portfolio.theme.primaryColor }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {portfolio.projects.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold mb-8" style={{ color: portfolio.theme.primaryColor }}>💼 Projects</h2>
+              <div className="grid grid-cols-2 gap-6">
+                {portfolio.projects.map((p, i) => (
+                  <div key={i} className="bg-white rounded-lg shadow-sm border overflow-hidden">
+                    {p.image && <img src={p.image} alt={p.title} className="w-full h-48 object-cover" />}
+                    <div className="p-6">
+                      <h3 className="text-xl font-bold mb-2">{p.title}</h3>
+                      <p className="text-gray-600 mb-4">{p.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {portfolio.experience.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold mb-8" style={{ color: portfolio.theme.primaryColor }}>💻 Experience</h2>
+              {portfolio.experience.map((ex, i) => (
+                <div key={i} className="bg-white rounded-lg shadow-sm border p-6 mb-4">
+                  <h3 className="text-xl font-bold">{ex.position}</h3>
+                  <p className="font-semibold" style={{ color: portfolio.theme.primaryColor }}>{ex.company}</p>
+                  <p className="text-sm text-gray-600 mb-2">{ex.duration}</p>
+                  <p className="text-gray-700">{ex.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          {portfolio.education.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold mb-8" style={{ color: portfolio.theme.primaryColor }}>🎓 Education</h2>
+              {portfolio.education.map((e, i) => (
+                <div key={i} className="bg-white rounded-lg shadow-sm border p-6 mb-4">
+                  <h3 className="text-xl font-bold">{e.degree}</h3>
+                  <p className="font-semibold" style={{ color: portfolio.theme.primaryColor }}>{e.school}</p>
+                  <p className="text-sm text-gray-600 mb-2">{e.year}</p>
+                  <p className="text-gray-700">{e.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="text-center bg-gray-50 rounded-lg p-8">
+            <h2 className="text-3xl font-bold mb-6" style={{ color: portfolio.theme.primaryColor }}>📞 Contact</h2>
+            <div className="flex justify-center gap-6">
+              {portfolio.contact.email && <p>📧 {portfolio.contact.email}</p>}
+              {portfolio.contact.phone && <p>📱 {portfolio.contact.phone}</p>}
+            </div>
+          </div>
         </div>
       </div>
     </div>
